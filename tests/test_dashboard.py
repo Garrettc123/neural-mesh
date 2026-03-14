@@ -53,7 +53,7 @@ class TestHealthEndpoint:
         assert resp.status_code == 200
 
     def test_health_returns_ok(self, client):
-        data = resp = client.get("/health").get_json()
+        data = client.get("/health").get_json()
         assert data["status"] == "ok"
 
     def test_health_has_timestamp(self, client):
@@ -114,6 +114,7 @@ class TestApiStatus:
         history.record(_make_event(run_id=1, healing_success=True, recovery_seconds=60.0))
         data = client.get("/api/status").get_json()
         assert data["mttr_seconds"] == pytest.approx(60.0)
+        assert data["mttr_display"] == "60s"
 
     def test_status_no_history(self):
         app = create_app(history=None, monitor=None)
