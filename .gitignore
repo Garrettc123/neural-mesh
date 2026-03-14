@@ -1,0 +1,42 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# Test / coverage artifacts
+.coverage
+coverage.xml
+.pytest_cache/
+htmlcov/
+
+# Build / distribution
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment variable files
+.env
+.env.*
+!.env.example
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Healing history (runtime state, not source)
+healing_history.json
+
+# macOS
+.DS_Store
+
+# Docker volumes (if mounted locally)
+data/
