@@ -1,0 +1,21 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python main.py"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on-failure"
+restartPolicyMaxRetries = 3
+
+[[services]]
+name = "neural-mesh-pipeline"
+source = "/"
+
+[services.variables]
+PORT = "8080"
+DASHBOARD_PORT = "8080"
+DASHBOARD_HOST = "0.0.0.0"
+GITHUB_OWNER = "Garrettc123"
+POLL_INTERVAL = "60"
+MAX_RETRY_ATTEMPTS = "3"

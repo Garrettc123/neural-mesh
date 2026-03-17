@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Neural Mesh – Self-Healing Pipeline Dashboard</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --green: #3fb950;
+      --red: #f85149;
+      --yellow: #d29922;
+      --blue: #58a6ff;
+      --purple: #bc8cff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 1.2rem; font-weight: 600; }
+    header span { color: var(--muted); font-size: 0.85rem; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    /* Cards */
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; }
+    .card .label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .5rem; }
+    .card .value { font-size: 2rem; font-weight: 700; }
+    .card .value.green { color: var(--green); }
+    .card .value.red { color: var(--red); }
+    .card .value.blue { color: var(--blue); }
+    .card .value.purple { color: var(--purple); }
+    .card .sub { font-size: 0.8rem; color: var(--muted); margin-top: .25rem; }
+    /* Section */
+    section { margin-bottom: 2rem; }
+    section h2 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    /* Table */
+    .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th { background: var(--bg); color: var(--muted); text-align: left; padding: .6rem 1rem; font-weight: 500; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border); }
+    td { padding: .65rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,.03); }
+    /* Badges */
+    .badge { display: inline-block; padding: .2em .55em; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+    .badge.success { background: rgba(63,185,80,.15); color: var(--green); }
+    .badge.failure { background: rgba(248,81,73,.15); color: var(--red); }
+    .badge.infra { background: rgba(88,166,255,.15); color: var(--blue); }
+    .badge.dep    { background: rgba(210,153,34,.15); color: var(--yellow); }
+    .badge.config { background: rgba(188,140,255,.15); color: var(--purple); }
+    .badge.unknown{ background: rgba(139,148,158,.15); color: var(--muted); }
+    /* Repo health grid */
+    .repos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+    .repo-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+    .repo-card .repo-name { font-size: 0.9rem; font-weight: 600; margin-bottom: .5rem; color: var(--blue); word-break: break-all; }
+    .repo-card .meta { font-size: 0.8rem; color: var(--muted); line-height: 1.7; }
+    .progress-bar { height: 6px; background: var(--border); border-radius: 3px; margin-top: .5rem; }
+    .progress-fill { height: 100%; border-radius: 3px; background: var(--green); transition: width .4s ease; }
+    /* Loading */
+    .loading { color: var(--muted); text-align: center; padding: 2rem; }
+    /* Footer */
+    footer { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.8rem; border-top: 1px solid var(--border); }
+    /* Status dot */
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  </style>
+</head>
+<body>
+<header>
+  <h1><span class="dot live"></span>Neural Mesh – Self-Healing CI/CD Pipeline</h1>
+  <span id="last-updated">Loading…</span>
+</header>
+
+<div class="container">
+  <!-- Summary cards -->
+  <div class="cards" id="cards">
+    <div class="card"><div class="label">Repos Monitored</div><div class="value blue" id="card-repos">–</div></div>
+    <div class="card"><div class="label">Healing Events Today</div><div class="value green" id="card-today">–</div></div>
+    <div class="card"><div class="label">Success Rate Today</div><div class="value green" id="card-rate">–</div><div class="sub" id="card-rate-all">All-time: –</div></div>
+    <div class="card"><div class="label">MTTR</div><div class="value purple" id="card-mttr">–</div><div class="sub">Mean Time to Recovery</div></div>
+    <div class="card"><div class="label">Total Events</div><div class="value blue" id="card-total">–</div></div>
+  </div>
+
+  <!-- Repo health -->
+  <section>
+    <h2>Repository Health</h2>
+    <div class="repos-grid" id="repos-grid"><p class="loading">Loading repo data…</p></div>
+  </section>
+
+  <!-- Recent healing events -->
+  <section>
+    <h2>Recent Healing Events</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Repository</th>
+            <th>Run ID</th>
+            <th>Failure Type</th>
+            <th>Action</th>
+            <th>Result</th>
+            <th>Recovery</th>
+            <th>Detected</th>
+          </tr>
+        </thead>
+        <tbody id="events-body"><tr><td colspan="7" class="loading">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<footer>Neural Mesh Self-Healing Pipeline &bull; Auto-refreshes every 30s</footer>
+
+<script>
+  const failureBadge = {
+    test_failure:        '<span class="badge failure">Test Failure</span>',
+    build_error:         '<span class="badge failure">Build Error</span>',
+    dependency_issue:    '<span class="badge dep">Dependency</span>',
+    infra_outage:        '<span class="badge infra">Infra Outage</span>',
+    configuration_error: '<span class="badge config">Config Error</span>',
+    unknown:             '<span class="badge unknown">Unknown</span>',
+  };
+
+  function fmtRecovery(sec) {
+    if (sec == null) return '–';
+    if (sec < 60) return sec.toFixed(0) + 's';
+    return (sec/60).toFixed(1) + 'm';
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '–';
+    const d = new Date(iso);
+    return d.toLocaleString();
+  }
+
+  async function loadStatus() {
+    try {
+      const r = await fetch('/api/status');
+      const d = await r.json();
+      document.getElementById('card-repos').textContent = d.repos_monitored ?? '–';
+      document.getElementById('card-today').textContent = d.healing_events_today ?? '–';
+      document.getElementById('card-rate').textContent = (d.success_rate_today ?? '–') + '%';
+      document.getElementById('card-rate-all').textContent = 'All-time: ' + (d.success_rate_all_time ?? '–') + '%';
+      document.getElementById('card-mttr').textContent = d.mttr_display ?? '–';
+      document.getElementById('card-total').textContent = d.total_healing_events ?? '–';
+      document.getElementById('last-updated').textContent = 'Updated ' + fmtDate(d.updated_at);
+    } catch(e) { console.error('status load failed', e); }
+  }
+
+  async function loadRepos() {
+    try {
+      const r = await fetch('/api/repos');
+      const d = await r.json();
+      const grid = document.getElementById('repos-grid');
+      const entries = Object.entries(d);
+      if (!entries.length) { grid.innerHTML = '<p class="loading">No healing events recorded yet.</p>'; return; }
+      grid.innerHTML = entries.map(([repo, stat]) => `
+        <div class="repo-card">
+          <div class="repo-name">${repo}</div>
+          <div class="meta">
+            Events: ${stat.total}<br/>
+            Success rate: ${stat.success_rate}%<br/>
+            MTTR: ${stat.mttr_seconds != null ? fmtRecovery(stat.mttr_seconds) : 'N/A'}<br/>
+            Last event: ${fmtDate(stat.last_event)}
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${stat.success_rate}%"></div></div>
+        </div>
+      `).join('');
+    } catch(e) { console.error('repos load failed', e); }
+  }
+
+  async function loadHistory() {
+    try {
+      const r = await fetch('/api/history');
+      const events = await r.json();
+      const tbody = document.getElementById('events-body');
+      if (!events.length) { tbody.innerHTML = '<tr><td colspan="7" class="loading">No events yet.</td></tr>'; return; }
+      tbody.innerHTML = events.slice(0, 50).map(e => `
+        <tr>
+          <td>${e.repo}</td>
+          <td><a href="${e.run_url}" target="_blank" style="color:var(--blue)">${e.run_id}</a></td>
+          <td>${failureBadge[e.failure_type] || e.failure_type}</td>
+          <td>${e.healing_action}</td>
+          <td>${e.healing_success ? '<span class="badge success">✓ Healed</span>' : '<span class="badge failure">✗ Failed</span>'}</td>
+          <td>${fmtRecovery(e.recovery_seconds)}</td>
+          <td>${fmtDate(e.detected_at)}</td>
+        </tr>
+      `).join('');
+    } catch(e) { console.error('history load failed', e); }
+  }
+
+  async function refresh() {
+    await Promise.all([loadStatus(), loadRepos(), loadHistory()]);
+  }
+
+  refresh();
+  setInterval(refresh, 30000);
+</script>
+</body>
+</html>

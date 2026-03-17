@@ -1,0 +1,71 @@
+name: Self-Healing Pipeline CI
+
+on:
+  push:
+    branches: [ main, "copilot/**" ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run daily health check at 08:00 UTC
+    - cron: '0 8 * * *'
+
+jobs:
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pytest with coverage
+        run: |
+          pytest tests/ -v \
+            --cov=pipeline \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --tb=short
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 14
+
+  docker:
+    name: Build Docker image
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t neural-mesh-pipeline:${{ github.sha }} .
+
+      - name: Verify container starts
+        run: |
+          docker run --rm -d \
+            --name pipeline-smoke \
+            -p 8080:8080 \
+            -e DASHBOARD_DEBUG=false \
+            neural-mesh-pipeline:${{ github.sha }}
+          sleep 5
+          curl --retry 5 --retry-delay 2 -f http://localhost:8080/health
+          docker stop pipeline-smoke
