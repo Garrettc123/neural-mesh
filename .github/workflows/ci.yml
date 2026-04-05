@@ -5,9 +5,10 @@ on:
     branches: [ main, "copilot/**" ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
   schedule:
-    # Run daily health check at 08:00 UTC
-    - cron: '0 8 * * *'
+    # Run daily health check at 14:00 UTC
+    - cron: '0 14 * * *'
 
 jobs:
   test:
