@@ -19,6 +19,7 @@ Environment variables (see pipeline/config.py for full list):
 """
 
 import logging
+import os
 import signal
 import sys
 import threading
@@ -146,6 +147,19 @@ def main() -> None:
         name="pipeline-monitor",
     )
     pipeline_thread.start()
+
+    # Optional passive Sync Core health publisher, never a code-healing command.
+    if os.getenv("GARCAR_MESH_PUBLISH_ENABLED", "").lower() == "true":
+        def mesh_heartbeat_loop():
+            from pipeline.mesh_heartbeat import send_heartbeat
+            while not _stop_event.is_set():
+                try:
+                    send_heartbeat("degraded")
+                except Exception:
+                    logger.warning("Mesh heartbeat unavailable; no action taken")
+                _stop_event.wait(timeout=300)
+        threading.Thread(target=mesh_heartbeat_loop, daemon=True,
+                         name="mesh-health-publisher").start()
 
     # Start dashboard
     app = create_app(history=history, monitor=monitor)
